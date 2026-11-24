@@ -145,7 +145,7 @@ class SelectionAccessibilityService : AccessibilityService() {
                 val preview = extracted.replace('\n', ' ').take(36)
                 MonitorState.update {
                     it.copy(
-                        axSelectionHitCount = it.axSelectionHitCount + 1,
+                        axSelectionDirectCount = it.axSelectionDirectCount + 1,
                         lastTriggerSummary = "[AX·选区事件] $displayPkg · ${extracted.length} 字",
                     )
                 }
@@ -157,6 +157,10 @@ class SelectionAccessibilityService : AccessibilityService() {
                     triggerSource = "AX·选区事件",
                 )
             } else {
+                MonitorState.update {
+                    it.copy(axSelectionNoTextCount = it.axSelectionNoTextCount + 1)
+                }
+                syncCountersToState()
                 MonitorState.addLog("[AX·选区事件] 检测到选区 ($displayPkg, $from..$to) 但节点未暴露文本，转由选词条探测")
                 scheduleToolbarProbe(displayPkg, triggerEventName = "SELECTION_FALLBACK")
             }
@@ -181,6 +185,7 @@ class SelectionAccessibilityService : AccessibilityService() {
         probeCount.incrementAndGet()
         val match = findCopyToolbarMatch()
         if (match == null) {
+            probeMissCount.incrementAndGet()
             ignoredEvents.incrementAndGet()
             return
         }
@@ -205,7 +210,7 @@ class SelectionAccessibilityService : AccessibilityService() {
             val preview = directText.replace('\n', ' ').take(36)
             MonitorState.update {
                 it.copy(
-                    axToolbarHitCount = it.axToolbarHitCount + 1,
+                    axToolbarFocusDirectCount = it.axToolbarFocusDirectCount + 1,
                     lastTriggerSummary = "[AX·选词条直读] $effectivePkg · ${directText.length} 字",
                 )
             }
@@ -221,7 +226,7 @@ class SelectionAccessibilityService : AccessibilityService() {
         } else {
             MonitorState.update {
                 it.copy(
-                    axToolbarHitCount = it.axToolbarHitCount + 1,
+                    axToolbarAutoCopyShownCount = it.axToolbarAutoCopyShownCount + 1,
                     lastTriggerSummary = "[AX·选词条+代复制] $effectivePkg · 「${match.buttonLabel}」",
                 )
             }
@@ -249,7 +254,7 @@ class SelectionAccessibilityService : AccessibilityService() {
                 val elapsed = (SystemClock.uptimeMillis() - startedAt).coerceAtLeast(1L)
                 MonitorState.update {
                     it.copy(
-                        axAutoCopyHitCount = it.axAutoCopyHitCount + 1,
+                        axAutoCopySuccessCount = it.axAutoCopySuccessCount + 1,
                         lastTriggerSummary = "[AX·代复制] $via · ${text.length} 字",
                     )
                 }
@@ -257,6 +262,13 @@ class SelectionAccessibilityService : AccessibilityService() {
                 MonitorState.addLog("[AX·代复制] 拿到文本 ($via, ${text.length}字, ${elapsed}ms)")
                 onResult(text)
             } else {
+                MonitorState.update {
+                    it.copy(
+                        axAutoCopyFailCount = it.axAutoCopyFailCount + 1,
+                        lastTriggerSummary = "[AX·代复制失败] $via",
+                    )
+                }
+                syncCountersToState()
                 MonitorState.addLog("[AX·代复制] 未能通过「$via」读取到文本")
                 onResult(null)
             }
@@ -496,6 +508,7 @@ class SelectionAccessibilityService : AccessibilityService() {
         private val totalEvents = AtomicInteger(0)
         private val ignoredEvents = AtomicInteger(0)
         private val probeCount = AtomicInteger(0)
+        private val probeMissCount = AtomicInteger(0)
         private val windowNoiseDropped = AtomicInteger(0)
 
         @Volatile
@@ -509,6 +522,7 @@ class SelectionAccessibilityService : AccessibilityService() {
                     axTotalEvents = totalEvents.get(),
                     axIgnoredEvents = ignoredEvents.get(),
                     axProbeCount = probeCount.get(),
+                    axProbeMissCount = probeMissCount.get(),
                     axWindowNoiseDropped = windowNoiseDropped.get(),
                 )
             }
@@ -518,6 +532,7 @@ class SelectionAccessibilityService : AccessibilityService() {
             totalEvents.set(0)
             ignoredEvents.set(0)
             probeCount.set(0)
+            probeMissCount.set(0)
             windowNoiseDropped.set(0)
         }
 

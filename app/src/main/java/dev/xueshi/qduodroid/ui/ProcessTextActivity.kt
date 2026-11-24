@@ -48,14 +48,16 @@ class ProcessTextActivity : AppCompatActivity() {
         }
 
         val cleaned = selectedText.trim()
-        val sourceLabel = if (intent?.action == Intent.ACTION_SEND) {
+        val isShare = intent?.action == Intent.ACTION_SEND
+        val sourceLabel = if (isShare) {
             "系统分享"
         } else {
             "选词菜单"
         }
         MonitorState.update {
             it.copy(
-                processTextTriggerCount = it.processTextTriggerCount + 1,
+                shareIntentCount = if (isShare) it.shareIntentCount + 1 else it.shareIntentCount,
+                processTextMenuCount = if (!isShare) it.processTextMenuCount + 1 else it.processTextMenuCount,
                 lastTriggerSummary = "[$sourceLabel] ${cleaned.length} 字",
             )
         }

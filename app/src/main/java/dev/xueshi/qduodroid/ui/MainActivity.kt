@@ -1317,9 +1317,15 @@ class MainActivity : AppCompatActivity() {
 
         tvLastTriggerSummary.text = "最近触发：${snap.lastTriggerSummary}"
         tvTriggerStatsDetail.text =
-            "选区事件直读：${snap.axSelectionHitCount} 次  ·  选词条联动：${snap.axToolbarHitCount} 次（代复制 ${snap.axAutoCopyHitCount}）\n" +
-                "剪贴板触发：${snap.clipTriggerCount} 次  ·  选词菜单/分享：${snap.processTextTriggerCount} 次\n" +
-                "无障碍实际扫描：${snap.axProbeCount} 次（零耗时过滤噪音 ${snap.axWindowNoiseDropped} 次）"
+            "【长按选词 · 无障碍】\n" +
+                "• 选区事件直读：${snap.axSelectionDirectCount} 次（无文本回落 ${snap.axSelectionNoTextCount}）\n" +
+                "• 弹窗触发·焦点直读：${snap.axToolbarFocusDirectCount} 次\n" +
+                "• 弹窗触发·代码代复制：弹栏 ${snap.axToolbarAutoCopyShownCount} · 成功 ${snap.axAutoCopySuccessCount} · 失败 ${snap.axAutoCopyFailCount}\n" +
+                "【主动动作 · 确定触发】\n" +
+                "• 主动复制（剪贴板）：${snap.clipTriggerCount} 次\n" +
+                "• 选词菜单「QDuo」：${snap.processTextMenuCount} 次 · 系统分享：${snap.shareIntentCount} 次\n" +
+                "【底层扫描诊断】\n" +
+                "• 弹窗扫描：${snap.axProbeCount} 次（未命中 ${snap.axProbeMissCount} · 过滤噪音 ${snap.axWindowNoiseDropped}）"
 
         val whitelistBase = if (snap.whitelistExempted) {
             "电池优化白名单：已豁免 ✓"

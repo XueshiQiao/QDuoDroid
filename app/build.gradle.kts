@@ -2,6 +2,13 @@ plugins {
     id("com.android.application")
 }
 
+val appVersionCode = 17
+val appVersionName = "0.3.3"
+
+base {
+    archivesName.set("QDuoDroid-v$appVersionName-build$appVersionCode")
+}
+
 android {
     namespace = "dev.xueshi.qduodroid"
     compileSdk = 37
@@ -10,8 +17,8 @@ android {
         applicationId = "dev.xueshi.qduodroid"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.3.2"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     buildFeatures {
