@@ -25,6 +25,13 @@ class AppPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_ENABLE_AX_SELECTION, true)
         set(value) = prefs.edit().putBoolean(KEY_ENABLE_AX_SELECTION, value).apply()
 
+    var actionBarAutoDismissSeconds: Int
+        get() = prefs.getInt(KEY_ACTION_BAR_AUTO_DISMISS_SEC, DEFAULT_AUTO_DISMISS_SEC)
+        set(value) = prefs.edit().putInt(KEY_ACTION_BAR_AUTO_DISMISS_SEC, value.coerceAtLeast(0)).apply()
+
+    val actionBarAutoDismissMs: Long
+        get() = actionBarAutoDismissSeconds * 1000L
+
     var llmProviderId: String
         get() = prefs.getString(KEY_LLM_PROVIDER, LlmProviders.DEEPSEEK.id)
             .orEmpty()
@@ -141,7 +148,14 @@ class AppPrefs(context: Context) {
         private const val KEY_ENABLE_FREEZE_WAKEUP = "enable_freeze_wakeup"
         private const val KEY_AUTO_START_MONITORING = "auto_start_monitoring"
         private const val KEY_ENABLE_AX_SELECTION = "enable_ax_selection"
+        private const val KEY_ACTION_BAR_AUTO_DISMISS_SEC = "action_bar_auto_dismiss_sec"
         private const val KEY_LLM_PROVIDER = "llm_provider_id"
+
+        const val DEFAULT_AUTO_DISMISS_SEC = 5
+        val AUTO_DISMISS_OPTIONS_SEC = listOf(3, 5, 8, 15, 30, 0)
+
+        fun formatAutoDismissLabel(seconds: Int): String =
+            if (seconds <= 0) "不自动消失" else "${seconds} 秒"
         private const val KEY_LLM_CUSTOM_FORMAT = "llm_custom_format"
         private const val KEY_USE_LLM_FOR_TRANSLATE = "use_llm_for_translate"
 

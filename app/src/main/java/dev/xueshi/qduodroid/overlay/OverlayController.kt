@@ -29,6 +29,7 @@ import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -42,6 +43,7 @@ import dev.xueshi.qduodroid.engine.FakeActionEngine
 import dev.xueshi.qduodroid.model.QDuoAction
 import dev.xueshi.qduodroid.state.MonitorState
 import dev.xueshi.qduodroid.ui.MainActivity
+import dev.xueshi.qduodroid.util.AppPrefs
 import dev.xueshi.qduodroid.util.SelfCopyGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +56,6 @@ import kotlin.math.abs
 
 object OverlayController {
 
-    private const val AUTO_DISMISS_MS = 5500L
     private const val OUTSIDE_TOUCH_GRACE_MS = 400L
     private const val TTS_IDLE_SHUTDOWN_MS = 60_000L
 
@@ -131,11 +132,17 @@ object OverlayController {
             setPadding(dp(themed, 6), dp(themed, 4), dp(themed, 6), dp(themed, 4))
             elevation = dp(themed, 12).toFloat()
             clipToOutline = true
-            background = GradientDrawable().apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    Color.parseColor("#3B7BE8"),
+                    Color.parseColor("#1D96DA"),
+                    Color.parseColor("#00A7C7"),
+                ),
+            ).apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(themed, 24).toFloat()
-                setColor(Color.parseColor("#F21E1F26"))
-                setStroke(dp(themed, 1), Color.parseColor("#33FFFFFF"))
+                setStroke(dp(themed, 1), Color.parseColor("#4DFFFFFF"))
             }
         }
 
@@ -193,7 +200,7 @@ object OverlayController {
         )
 
         val divider = View(themed).apply {
-            setBackgroundColor(Color.parseColor("#29FFFFFF"))
+            setBackgroundColor(Color.parseColor("#45FFFFFF"))
         }
         pillContainer.addView(
             divider,
@@ -228,7 +235,7 @@ object OverlayController {
                 .setDuration(160L)
                 .setInterpolator(DecelerateInterpolator())
                 .start()
-            scheduleAutoDismiss()
+            scheduleAutoDismiss(appContext)
         }.onFailure { err ->
             MonitorState.addLog("悬浮条显示失败: ${err.javaClass.simpleName}: ${err.message}")
         }
@@ -840,11 +847,14 @@ object OverlayController {
         tts = null
     }
 
-    private fun scheduleAutoDismiss() {
+    private fun scheduleAutoDismiss(context: Context) {
         dismissRunnable?.let { mainHandler.removeCallbacks(it) }
-        val r = Runnable { dismissActionBar(reason = "超时") }
+        dismissRunnable = null
+        val timeoutMs = AppPrefs(context).actionBarAutoDismissMs
+        if (timeoutMs <= 0L) return
+        val r = Runnable { dismissActionBar(reason = "超时 (${timeoutMs / 1000}秒)") }
         dismissRunnable = r
-        mainHandler.postDelayed(r, AUTO_DISMISS_MS)
+        mainHandler.postDelayed(r, timeoutMs)
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -854,13 +864,12 @@ object OverlayController {
         rootView: View,
         params: WindowManager.LayoutParams,
     ): View {
-        return TextView(context).apply {
-            text = "⋮⋮"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setTextColor(Color.parseColor("#9CA3AF"))
-            minWidth = dp(context, 22)
-            gravity = Gravity.CENTER
-            setPadding(dp(context, 6), dp(context, 8), dp(context, 4), dp(context, 8))
+        return ImageView(context).apply {
+            setImageResource(R.drawable.ic_qduo_bar_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "QDuo"
+            layoutParams = LinearLayout.LayoutParams(dp(context, 28), dp(context, 28))
+            setPadding(dp(context, 5), dp(context, 5), dp(context, 3), dp(context, 5))
 
             var downRawY = 0f
             var initialY = 0
@@ -883,7 +892,7 @@ object OverlayController {
                         true
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        scheduleAutoDismiss()
+                        scheduleAutoDismiss(context.applicationContext)
                         true
                     }
                     else -> false
@@ -903,7 +912,7 @@ object OverlayController {
             isSingleLine = true
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = if (subtle) Typeface.DEFAULT else Typeface.DEFAULT_BOLD
-            setTextColor(if (subtle) Color.parseColor("#9CA3AF") else Color.WHITE)
+            setTextColor(if (subtle) Color.parseColor("#D9FFFFFF") else Color.WHITE)
             setPadding(dp(context, 8), dp(context, 8), dp(context, 8), dp(context, 8))
             isClickable = true
             isFocusable = true

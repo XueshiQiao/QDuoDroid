@@ -86,6 +86,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnToggleWatch: MaterialButton
     private lateinit var switchAutoMonitor: MaterialSwitch
     private lateinit var switchAccessibilitySelection: MaterialSwitch
+    private lateinit var layoutAutoDismissSelector: LinearLayout
+    private lateinit var tvAutoDismissValue: TextView
     private lateinit var layoutTriggerStatsBox: LinearLayout
     private lateinit var tvResetStats: TextView
     private lateinit var tvLastTriggerSummary: TextView
@@ -195,6 +197,7 @@ class MainActivity : AppCompatActivity() {
         setupHeaderVersion()
         styleAiInputBoxes()
         loadAiConfigIntoUi()
+        renderAutoDismissUi()
         lastHandledWhitelistSeq = MonitorState.snapshot.value.whitelistFeedbackSeq
         lastHandledWakeTestSeq = MonitorState.snapshot.value.wakeTestFeedbackSeq
         lastHandledAxEnableSeq = MonitorState.snapshot.value.axEnableFeedbackSeq
@@ -259,6 +262,8 @@ class MainActivity : AppCompatActivity() {
         btnToggleWatch = findViewById(R.id.btnToggleWatch)
         switchAutoMonitor = findViewById(R.id.switchAutoMonitor)
         switchAccessibilitySelection = findViewById(R.id.switchAccessibilitySelection)
+        layoutAutoDismissSelector = findViewById(R.id.layoutAutoDismissSelector)
+        tvAutoDismissValue = findViewById(R.id.tvAutoDismissValue)
         layoutTriggerStatsBox = findViewById(R.id.layoutTriggerStatsBox)
         tvResetStats = findViewById(R.id.tvResetStats)
         tvLastTriggerSummary = findViewById(R.id.tvLastTriggerSummary)
@@ -343,6 +348,7 @@ class MainActivity : AppCompatActivity() {
         val strokeColor = Color.parseColor("#E5E7EB")
         val fillColor = Color.parseColor("#F3F4F6")
         listOf(
+            layoutAutoDismissSelector,
             layoutProviderSelector,
             layoutFormatSelector,
             etLlmBaseUrl,
@@ -480,6 +486,10 @@ class MainActivity : AppCompatActivity() {
         tvResetStats.setOnClickListener {
             MonitorState.resetStats()
             Toast.makeText(this, "已重置统计数据", Toast.LENGTH_SHORT).show()
+        }
+
+        layoutAutoDismissSelector.setOnClickListener {
+            showAutoDismissPickerDialog()
         }
 
         switchAutoWhitelist.setOnCheckedChangeListener { _, isChecked ->
@@ -1458,6 +1468,33 @@ class MainActivity : AppCompatActivity() {
             appPrefs.llmReasoningEffort = clamped
         }
         tvThinkingValue.text = provider.labelForEffort(clamped, format, levels)
+    }
+
+    private fun renderAutoDismissUi() {
+        tvAutoDismissValue.text = AppPrefs.formatAutoDismissLabel(appPrefs.actionBarAutoDismissSeconds)
+    }
+
+    private fun showAutoDismissPickerDialog() {
+        val options = AppPrefs.AUTO_DISMISS_OPTIONS_SEC
+        val currentSec = appPrefs.actionBarAutoDismissSeconds
+        val currentIdx = options.indexOf(currentSec).let { if (it >= 0) it else options.indexOf(AppPrefs.DEFAULT_AUTO_DISMISS_SEC) }
+        val labels = options.map { sec ->
+            if (sec == AppPrefs.DEFAULT_AUTO_DISMISS_SEC) "${sec} 秒（默认）" else AppPrefs.formatAutoDismissLabel(sec)
+        }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("悬浮条自动消失时间")
+            .setSingleChoiceItems(labels, currentIdx) { dialog, which ->
+                dialog.dismiss()
+                val chosen = options[which]
+                appPrefs.actionBarAutoDismissSeconds = chosen
+                renderAutoDismissUi()
+                val label = AppPrefs.formatAutoDismissLabel(chosen)
+                MonitorState.addLog("悬浮条自动消失时间已设为：$label")
+                Toast.makeText(this, "已设为：$label", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun showThinkingPickerDialog() {
