@@ -22,11 +22,11 @@ Android 版 **QDuo**：结合 **低功耗双通道无障碍选词感知**、**Sh
 # 运行单元测试与编译 Debug APK
 ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
 
-# 产物位置
-ls -lh app/build/outputs/apk/debug/app-debug.apk
+# 产物位置（文件名带版本号和 build 号，例如 QDuoDroid-v0.3.6-build20-debug.apk）
+ls -lh app/build/outputs/apk/debug/
 
 # ADB 安装（需手机亮屏解锁并允许 USB 安装）
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/QDuoDroid-v<版本号>-build<build号>-debug.apk
 ```
 
 ## 架构与踩坑笔记

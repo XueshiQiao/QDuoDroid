@@ -144,7 +144,6 @@ class MainActivity : AppCompatActivity() {
     private var userToggledPermissionsCard = false
     private var permissionsExpanded = true
     private var aiConfigExpanded = false
-    private var userManuallyPaused = false
     private var watchStartInFlight = false
     private var lastRenderedLogs: List<String>? = null
     private var lastHandledWhitelistSeq = 0L
@@ -439,11 +438,11 @@ class MainActivity : AppCompatActivity() {
         btnToggleWatch.setOnClickListener {
             val running = MonitorState.snapshot.value.watchServiceRunning
             if (running) {
-                userManuallyPaused = true
+                appPrefs.userPausedMonitoring = true
                 watchStartInFlight = false
                 ClipboardWatchService.stop(this)
             } else {
-                userManuallyPaused = false
+                appPrefs.userPausedMonitoring = false
                 startWatchingWithChecks()
             }
         }
@@ -457,7 +456,7 @@ class MainActivity : AppCompatActivity() {
                     if (isChecked) "已开启条件满足时自动监听" else "已关闭自动监听",
                 )
                 if (isChecked) {
-                    userManuallyPaused = false
+                    appPrefs.userPausedMonitoring = false
                     maybeAutoStartMonitoring()
                 }
             }
@@ -1254,7 +1253,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun maybeAutoStartMonitoring() {
         val snap = MonitorState.snapshot.value
-        if (!snap.autoStartMonitoring || userManuallyPaused || snap.watchServiceRunning || watchStartInFlight) {
+        if (!snap.autoStartMonitoring || appPrefs.userPausedMonitoring || snap.watchServiceRunning || watchStartInFlight) {
             return
         }
         if (snap.shizukuRunning && snap.shizukuGranted && Settings.canDrawOverlays(this)) {

@@ -21,6 +21,11 @@ class AppPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_START_MONITORING, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_START_MONITORING, value).apply()
 
+    /** 用户手动停止了剪贴板监听（在 app 里点暂停，或在通知栏点「停止」）。为 true 时不再自动开启监听，直到用户手动开启。 */
+    var userPausedMonitoring: Boolean
+        get() = prefs.getBoolean(KEY_USER_PAUSED_MONITORING, false)
+        set(value) = prefs.edit().putBoolean(KEY_USER_PAUSED_MONITORING, value).apply()
+
     var enableAccessibilitySelection: Boolean
         get() = prefs.getBoolean(KEY_ENABLE_AX_SELECTION, true)
         set(value) = prefs.edit().putBoolean(KEY_ENABLE_AX_SELECTION, value).apply()
@@ -149,15 +154,16 @@ class AppPrefs(context: Context) {
         private const val KEY_AUTO_START_MONITORING = "auto_start_monitoring"
         private const val KEY_ENABLE_AX_SELECTION = "enable_ax_selection"
         private const val KEY_ACTION_BAR_AUTO_DISMISS_SEC = "action_bar_auto_dismiss_sec"
+        private const val KEY_USER_PAUSED_MONITORING = "user_paused_monitoring"
         private const val KEY_LLM_PROVIDER = "llm_provider_id"
+        private const val KEY_LLM_CUSTOM_FORMAT = "llm_custom_format"
+        private const val KEY_USE_LLM_FOR_TRANSLATE = "use_llm_for_translate"
 
         const val DEFAULT_AUTO_DISMISS_SEC = 5
         val AUTO_DISMISS_OPTIONS_SEC = listOf(3, 5, 8, 15, 30, 0)
 
         fun formatAutoDismissLabel(seconds: Int): String =
             if (seconds <= 0) "不自动消失" else "${seconds} 秒"
-        private const val KEY_LLM_CUSTOM_FORMAT = "llm_custom_format"
-        private const val KEY_USE_LLM_FOR_TRANSLATE = "use_llm_for_translate"
 
         private const val KEY_LEGACY_BASE_URL = "llm_base_url"
         private const val KEY_LEGACY_API_KEY = "llm_api_key"

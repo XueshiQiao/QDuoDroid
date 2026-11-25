@@ -17,6 +17,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import dev.xueshi.qduodroid.overlay.OverlayController
 import dev.xueshi.qduodroid.state.MonitorState
+import dev.xueshi.qduodroid.util.ClipSensitivity
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -142,7 +143,6 @@ class SelectionAccessibilityService : AccessibilityService() {
                 }
                 lastPathAText = extracted
                 lastPathAHitAtMs = now
-                val preview = extracted.replace('\n', ' ').take(36)
                 MonitorState.update {
                     it.copy(
                         axSelectionDirectCount = it.axSelectionDirectCount + 1,
@@ -150,7 +150,7 @@ class SelectionAccessibilityService : AccessibilityService() {
                     )
                 }
                 syncCountersToState()
-                MonitorState.addLog("[AX·选区事件] 命中 ($displayPkg, $from..$to, ${extracted.length}字): $preview")
+                MonitorState.addLog("[AX·选区事件] 命中 ($displayPkg, $from..$to, ${extracted.length}字)")
                 OverlayController.showActionBar(
                     context = applicationContext,
                     text = extracted,
@@ -207,7 +207,6 @@ class SelectionAccessibilityService : AccessibilityService() {
         val directText = tryReadFocusedSelectionText()
 
         if (!directText.isNullOrBlank()) {
-            val preview = directText.replace('\n', ' ').take(36)
             MonitorState.update {
                 it.copy(
                     axToolbarFocusDirectCount = it.axToolbarFocusDirectCount + 1,
@@ -216,7 +215,7 @@ class SelectionAccessibilityService : AccessibilityService() {
             }
             syncCountersToState()
             MonitorState.addLog(
-                "[AX·选词条] 命中 ($effectivePkg, 按钮「${match.buttonLabel}」, via=$triggerEventName) 且焦点直读到 (${directText.length}字): $preview",
+                "[AX·选词条] 命中 ($effectivePkg, 按钮「${match.buttonLabel}」, via=$triggerEventName) 且焦点直读到 (${directText.length}字)",
             )
             OverlayController.showActionBar(
                 context = applicationContext,
@@ -321,6 +320,7 @@ class SelectionAccessibilityService : AccessibilityService() {
             val cm = getSystemService(ClipboardManager::class.java)
             val clip = cm?.primaryClip ?: return null
             if (clip.itemCount <= 0) return null
+            if (ClipSensitivity.isSensitive(clip.description?.extras)) return null
             clip.getItemAt(0).text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
         }.getOrNull()
     }

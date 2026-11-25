@@ -26,6 +26,7 @@ import dev.xueshi.qduodroid.overlay.OverlayController
 import dev.xueshi.qduodroid.shizuku.ClipboardUserService
 import dev.xueshi.qduodroid.state.MonitorState
 import dev.xueshi.qduodroid.ui.MainActivity
+import dev.xueshi.qduodroid.util.AppPrefs
 import dev.xueshi.qduodroid.util.SelfCopyGuard
 import rikka.shizuku.Shizuku
 
@@ -151,6 +152,7 @@ class ClipboardWatchService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             MonitorState.addLog("用户从通知栏停止监听")
+            AppPrefs(this).userPausedMonitoring = true
             stopSelf()
             return START_NOT_STICKY
         }
@@ -378,7 +380,6 @@ class ClipboardWatchService : Service() {
         }
 
         val sourceLabel = if (fromFreezeWake) "剪贴板·解冻唤醒" else "剪贴板·直连"
-        val preview = normalized.replace('\n', ' ').take(40)
         MonitorState.update {
             it.copy(
                 lastCapturedText = normalized,
@@ -386,7 +387,7 @@ class ClipboardWatchService : Service() {
                 lastTriggerSummary = "[$sourceLabel] ${normalized.length} 字",
             )
         }
-        MonitorState.addLog("[$sourceLabel] 捕获 (${normalized.length} 字): $preview")
+        MonitorState.addLog("[$sourceLabel] 捕获 (${normalized.length} 字)")
 
         mainHandler.post {
             OverlayController.showActionBar(

@@ -8,6 +8,7 @@ import android.os.Process
 import android.util.Log
 import dev.xueshi.qduodroid.IClipboardCallback
 import dev.xueshi.qduodroid.IClipboardMonitorService
+import dev.xueshi.qduodroid.util.ClipSensitivity
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.lang.reflect.Method
 import java.util.concurrent.Executors
@@ -143,6 +144,11 @@ class ClipboardUserService() : IClipboardMonitorService.Stub() {
 
     override fun getCurrentClipText(): String? {
         val clip = invokeClipboardMethod("getPrimaryClip") as? ClipData ?: return null
+        if (isSensitiveClip(clip)) return null
+        return extractClipText(clip)
+    }
+
+    private fun extractClipText(clip: ClipData): String? {
         for (i in 0 until clip.itemCount) {
             val item = clip.getItemAt(i)
             val text = item.text?.toString()
@@ -214,10 +220,21 @@ class ClipboardUserService() : IClipboardMonitorService.Stub() {
     }
 
     private fun handleClipEvent() {
-        var text = runCatching { getCurrentClipText() }.getOrNull()
+        var clip = readPrimaryClip()
+        var text = clip?.let { extractClipText(it) }
         if (text.isNullOrBlank()) {
             runCatching { Thread.sleep(120L) }
-            text = runCatching { getCurrentClipText() }.getOrNull()
+            clip = readPrimaryClip()
+            text = clip?.let { extractClipText(it) }
+        }
+        if (clip != null && isSensitiveClip(clip)) {
+            // 密码管理器等应用复制的敏感内容：不弹悬浮条、不暂存、不记录内容。
+            lastText = null
+            lastEventAtMs = System.currentTimeMillis()
+            runCatching {
+                activeCallback?.onDebugLog("剪贴板内容被来源应用标记为敏感（如密码），已忽略")
+            }
+            return
         }
         if (text.isNullOrBlank()) {
             runCatching {
@@ -313,6 +330,9 @@ class ClipboardUserService() : IClipboardMonitorService.Stub() {
         }
     }
 
+    private fun readPrimaryClip(): ClipData? =
+        runCatching { invokeClipboardMethod("getPrimaryClip") as? ClipData }.getOrNull()
+
     private fun notifyStatus(status: String) {
         modeStatus = status
         runCatching {
@@ -407,5 +427,8 @@ class ClipboardUserService() : IClipboardMonitorService.Stub() {
     companion object {
         private const val CALLING_PACKAGE = "com.android.shell"
         private const val DUPLICATE_EVENT_DEBOUNCE_MS = 350L
+
+        fun isSensitiveClip(clip: ClipData): Boolean =
+            ClipSensitivity.isSensitive(clip.description?.extras)
     }
 }

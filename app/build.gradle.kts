@@ -2,8 +2,8 @@ plugins {
     id("com.android.application")
 }
 
-val appVersionCode = 19
-val appVersionName = "0.3.5"
+val appVersionCode = 20
+val appVersionName = "0.3.6"
 
 base {
     archivesName.set("QDuoDroid-v$appVersionName-build$appVersionCode")

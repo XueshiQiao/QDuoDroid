@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  允许明文 HTTP：用户可以把大模型地址填成局域网或本机上的服务（比如 Ollama、自建网关），
+  这类服务通常只有 http://。LlmEndpoint.isLocal() 会给局域网地址自动补 http://，
+  没有这份配置时 Android 9+ 会直接拒绝请求（Cleartext HTTP traffic not permitted）。
+  Android 的域名配置不支持按 IP 网段放行，所以只能在 base-config 里整体放开；
+  公网服务商的默认地址都是 https://，不受影响。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
