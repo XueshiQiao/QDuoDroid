@@ -25,8 +25,11 @@ jobs:
           java-version: "17"
 
       # 安装 Android SDK 并接受许可；缺少的 platform / build-tools 由 Android Gradle 插件在构建时自动下载
+      # 默认会安装已经下架的 `tools` 组件导致报错，所以显式只装 platform-tools
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
