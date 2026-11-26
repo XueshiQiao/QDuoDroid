@@ -1,5 +1,6 @@
 package dev.xueshi.qduodroid.engine
 
+import dev.xueshi.qduodroid.model.ActionKind
 import dev.xueshi.qduodroid.model.QDuoAction
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -15,14 +16,29 @@ object FakeActionEngine {
         val isMostlyChinese = cjkCount * 3 >= text.length
         val preview = if (text.length > 72) text.take(72) + "…" else text
 
-        return when (action) {
-            QDuoAction.TRANSLATE -> buildTranslateMock(text, preview, isMostlyChinese)
-            QDuoAction.POLISH -> buildPolishMock(text, preview, isMostlyChinese)
-            QDuoAction.SUMMARIZE -> buildSummarizeMock(text, preview, isMostlyChinese)
-            QDuoAction.EXPLAIN -> buildExplainMock(text, preview, isMostlyChinese)
-            QDuoAction.SEARCH -> "将使用浏览器搜索：$preview"
-            QDuoAction.SPEAK -> "正在通过系统 TTS 朗读：$preview"
+        return when {
+            action.kind == ActionKind.OPEN_URL -> "将打开网址：${QDuoAction.fillUrl(action.url, preview)}"
+            action.kind == ActionKind.SPEAK -> "正在通过系统 TTS 朗读：$preview"
+            action.kind == ActionKind.TRANSLATE || action.id == "translate" || action.title.contains("翻译") ->
+                buildTranslateMock(text, preview, isMostlyChinese)
+            action.id == "polish" || action.title.contains("润色") -> buildPolishMock(text, preview, isMostlyChinese)
+            action.id == "summarize" || action.title.contains("总结") -> buildSummarizeMock(text, preview, isMostlyChinese)
+            action.id == "explain" || action.title.contains("解释") -> buildExplainMock(text, preview, isMostlyChinese)
+            else -> buildGenericAiMock(action, text)
         }
+    }
+
+    private fun buildGenericAiMock(action: QDuoAction, text: String): String {
+        val promptPreview = action.prompt.trim().let { if (it.length > 120) it.take(120) + "…" else it }
+            .ifEmpty { "（这个动作还没有写提示词）" }
+        return """
+            |[Demo Mock · ${action.title}]
+            |
+            |这是「${action.title}」的演示结果，没有真正调用 AI 模型。
+            |配置好 AI 模型后，QDuo 会把下面这段提示词和选中的文字（共 ${text.length} 字）一起发给模型：
+            |
+            |$promptPreview
+        """.trimMargin()
     }
 
     fun stream(action: QDuoAction, rawInput: String, delayMs: Long = 22L): Flow<String> = flow {

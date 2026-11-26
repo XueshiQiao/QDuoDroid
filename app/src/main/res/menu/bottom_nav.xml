@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/tabActions"
+        android:icon="@drawable/ic_tab_actions"
+        android:title="动作" />
+    <item
+        android:id="@+id/tabSettings"
+        android:icon="@drawable/ic_tab_settings"
+        android:title="设置" />
+    <item
+        android:id="@+id/tabDebug"
+        android:icon="@drawable/ic_tab_debug"
+        android:title="诊断" />
+</menu>

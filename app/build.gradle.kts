@@ -2,8 +2,8 @@ plugins {
     id("com.android.application")
 }
 
-val appVersionCode = 20
-val appVersionName = "0.3.6"
+val appVersionCode = 21
+val appVersionName = "0.4.0"
 
 // release 签名：只在设置了下面这几个环境变量时启用（GitHub Actions 的发布流程会设置）。
 // 没设置时 release 包不签名，debug 包照常用本机的 debug 密钥。

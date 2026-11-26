@@ -40,9 +40,11 @@ import dev.xueshi.qduodroid.R
 import dev.xueshi.qduodroid.engine.ActionEvent
 import dev.xueshi.qduodroid.engine.ActionExecutor
 import dev.xueshi.qduodroid.engine.FakeActionEngine
+import dev.xueshi.qduodroid.model.ActionKind
 import dev.xueshi.qduodroid.model.QDuoAction
 import dev.xueshi.qduodroid.state.MonitorState
 import dev.xueshi.qduodroid.ui.MainActivity
+import dev.xueshi.qduodroid.util.ActionStore
 import dev.xueshi.qduodroid.util.AppPrefs
 import dev.xueshi.qduodroid.util.SelfCopyGuard
 import kotlinx.coroutines.CoroutineScope
@@ -153,7 +155,11 @@ object OverlayController {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        for (action in QDuoAction.entries) {
+        val barActions = ActionStore.enabledActions(appContext)
+        if (barActions.isEmpty()) {
+            MonitorState.addLog("动作列表里没有打开的动作，悬浮条上只有关闭按钮")
+        }
+        for (action in barActions) {
             val btn = createBarButton(themed, action.title) {
                 dismissActionBar()
                 if (text.isNotBlank()) {
@@ -253,7 +259,7 @@ object OverlayController {
         runCatching { wm.removeViewImmediate(view) }
     }
 
-    fun showResultSheet(context: Context, text: String, initialAction: QDuoAction) {
+    fun showResultSheet(context: Context, text: String, initialAction: QDuoAction?) {
         val appContext = context.applicationContext
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post { showResultSheet(appContext, text, initialAction) }
@@ -405,22 +411,25 @@ object OverlayController {
     fun handleAction(context: Context, text: String, action: QDuoAction) {
         val appContext = context.applicationContext
         MonitorState.addLog("执行动作「${action.title}」(${text.length} 字)")
-        when {
-            action.isSheetAction -> showResultSheet(appContext, text, action)
-            action == QDuoAction.SEARCH -> openBrowserSearch(appContext, text)
-            action == QDuoAction.SPEAK -> speakText(appContext, text)
+        when (action.kind) {
+            ActionKind.AI, ActionKind.TRANSLATE -> showResultSheet(appContext, text, action)
+            ActionKind.OPEN_URL -> openUrl(appContext, action, text)
+            ActionKind.SPEAK -> speakText(appContext, text)
         }
     }
 
     fun buildResultSheetView(
         context: Context,
         inputText: String,
-        initialAction: QDuoAction,
+        initialAction: QDuoAction?,
         onDismiss: () -> Unit,
     ): View {
         val palette = sheetPalette(context)
-        val startAction = if (initialAction.isSheetAction) initialAction else QDuoAction.TRANSLATE
-        var activeAction = startAction
+        // 卡片顶部的切换按钮：列表里打开着的、会显示结果的动作（AI 动作和免费翻译）。
+        val sheetActions = ActionStore.enabledActions(context).filter { it.showsResult }
+        // 一开始显示哪个动作的结果：点的那个；没有指定（系统选词菜单、分享）就用列表里第一个。
+        val startAction = initialAction?.takeIf { it.showsResult } ?: sheetActions.firstOrNull()
+        var activeAction: QDuoAction? = startAction
         var currentOutput = ""
         var quoteExpanded = false
 
@@ -502,7 +511,12 @@ object OverlayController {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(context, 12), 0, dp(context, 10))
         }
-        val chipViews = mutableMapOf<QDuoAction, TextView>()
+        val chipScroll = HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            addView(chipRow)
+        }
+        val chipViews = mutableMapOf<String, TextView>()
 
         // Original text box (tap to expand/collapse)
         val originalBox = TextView(context).apply {
@@ -571,8 +585,8 @@ object OverlayController {
         var actionJob: Job? = null
 
         fun updateChipStyles(selected: QDuoAction) {
-            for ((action, chip) in chipViews) {
-                val isSelected = action == selected
+            for ((actionId, chip) in chipViews) {
+                val isSelected = actionId == selected.id
                 chip.setTextColor(if (isSelected) Color.WHITE else palette.chipInactiveText)
                 chip.background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -663,7 +677,12 @@ object OverlayController {
             }
         }
 
-        for (action in QDuoAction.sheetActions) {
+        val chipActions = if (startAction != null && sheetActions.none { it.id == startAction.id }) {
+            listOf(startAction) + sheetActions
+        } else {
+            sheetActions
+        }
+        for (action in chipActions) {
             val chip = TextView(context).apply {
                 text = action.title
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -671,7 +690,7 @@ object OverlayController {
                 setPadding(dp(context, 14), dp(context, 7), dp(context, 14), dp(context, 7))
                 setOnClickListener { runAction(action) }
             }
-            chipViews[action] = chip
+            chipViews[action.id] = chip
             chipRow.addView(
                 chip,
                 LinearLayout.LayoutParams(
@@ -683,7 +702,7 @@ object OverlayController {
             )
         }
 
-        root.addView(chipRow)
+        root.addView(chipScroll)
         root.addView(
             originalBox,
             LinearLayout.LayoutParams(
@@ -718,7 +737,7 @@ object OverlayController {
             SelfCopyGuard.shared.markSelfCopied(textToCopy)
             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("QDuo Result", textToCopy))
-            MonitorState.addLog("已复制「${activeAction.title}」结果（已启用防回环保护）")
+            MonitorState.addLog("已复制「${activeAction?.title.orEmpty()}」结果（已启用防回环保护）")
             Toast.makeText(context, "已复制结果", Toast.LENGTH_SHORT).show()
         }
         val speakBtn = createFooterButton(context, "朗读", primary = false, palette = palette) {
@@ -726,7 +745,7 @@ object OverlayController {
             speakText(context.applicationContext, toSpeak)
         }
         val retryBtn = createFooterButton(context, "重试", primary = false, palette = palette) {
-            runAction(activeAction)
+            activeAction?.let { runAction(it) }
         }
         val closeFooterBtn = createFooterButton(context, "关闭", primary = false, palette = palette) {
             onDismiss()
@@ -759,30 +778,33 @@ object OverlayController {
         footerRow.addView(closeFooterBtn)
         root.addView(footerRow)
 
-        runAction(startAction)
+        if (startAction != null) {
+            runAction(startAction)
+        } else {
+            engineBadge.text = "没有可用的动作"
+            resultView.setTextColor(palette.textSecondary)
+            resultView.text = "动作列表里没有打开着的「AI 动作」或「免费翻译」，所以这里没有结果可以显示。\n\n" +
+                "请打开 QDuo，在「动作」页添加一个，或者把已有的打开。"
+        }
         return root
     }
 
-    private fun openBrowserSearch(appContext: Context, queryText: String) {
-        val q = queryText.trim().take(200)
-        if (q.isEmpty()) return
-        val searchUri = Uri.parse("https://www.google.com/search?q=${Uri.encode(q)}")
-        val viewIntent = Intent(Intent.ACTION_VIEW, searchUri).apply {
+    private fun openUrl(appContext: Context, action: QDuoAction, text: String) {
+        if (text.isBlank()) return
+        val template = action.url.trim()
+        if (template.isEmpty()) {
+            Toast.makeText(appContext, "「${action.title}」还没有填网址", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val target = QDuoAction.fillUrl(template, text)
+        val viewIntent = Intent(Intent.ACTION_VIEW, Uri.parse(target)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        val launched = runCatching {
+        runCatching {
             appContext.startActivity(viewIntent)
-        }.isSuccess
-        if (!launched) {
-            val webIntent = Intent(Intent.ACTION_WEB_SEARCH).apply {
-                putExtra("query", q)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            runCatching {
-                appContext.startActivity(webIntent)
-            }.onFailure {
-                Toast.makeText(appContext, "未能拉起浏览器（可能需开启后台弹出界面权限）", Toast.LENGTH_SHORT).show()
-            }
+        }.onFailure { err ->
+            MonitorState.addLog("「${action.title}」打开网址失败: ${err.javaClass.simpleName}")
+            Toast.makeText(appContext, "未能打开网址（没有能打开它的 App，或需开启后台弹出界面权限）", Toast.LENGTH_SHORT).show()
         }
     }
 

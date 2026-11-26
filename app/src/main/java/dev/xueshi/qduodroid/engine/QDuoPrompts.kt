@@ -1,7 +1,6 @@
 package dev.xueshi.qduodroid.engine
 
-import dev.xueshi.qduodroid.model.QDuoAction
-
+/** 默认动作用的提示词。用户新建或编辑动作时可以自己改，这里只是默认值。 */
 object QDuoPrompts {
 
     const val TRANSLATE_PROMPT =
@@ -25,12 +24,4 @@ object QDuoPrompts {
         "You are a concise explainer. Explain the meaning of the user's selected text (and " +
             "any notable terms or context) in 2-4 sentences. Respond in the same language as " +
             "the text. Output ONLY the explanation."
-
-    fun forAction(action: QDuoAction): String = when (action) {
-        QDuoAction.TRANSLATE -> TRANSLATE_PROMPT
-        QDuoAction.POLISH -> POLISH_PROMPT
-        QDuoAction.SUMMARIZE -> SUMMARIZE_PROMPT
-        QDuoAction.EXPLAIN -> EXPLAIN_PROMPT
-        QDuoAction.SEARCH, QDuoAction.SPEAK -> ""
-    }
 }

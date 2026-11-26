@@ -1,6 +1,7 @@
 package dev.xueshi.qduodroid.engine
 
 import android.content.Context
+import dev.xueshi.qduodroid.model.ActionKind
 import dev.xueshi.qduodroid.model.QDuoAction
 import dev.xueshi.qduodroid.util.AppPrefs
 import kotlinx.coroutines.flow.Flow
@@ -42,7 +43,7 @@ object ActionExecutor {
         val text = inputText.trim()
         val prefs = AppPrefs(context)
 
-        if (action == QDuoAction.TRANSLATE && !(prefs.useLlmForTranslate && prefs.hasLlmConfig())) {
+        if (action.kind == ActionKind.TRANSLATE) {
             val (_, targetName) = BilibiliTranslator.detectTarget(text)
             val badge = "Bilibili 免费翻译 · 译成$targetName"
             return flow {
@@ -59,6 +60,28 @@ object ActionExecutor {
                     ActionEvent.Failure(
                         engineBadge = "Bilibili 免费翻译 · 失败",
                         errorMessage = "翻译请求失败：${err.message ?: err.javaClass.simpleName}",
+                    ),
+                )
+            }
+        }
+
+        if (action.kind != ActionKind.AI) {
+            return flow {
+                emit(
+                    ActionEvent.Failure(
+                        engineBadge = action.title,
+                        errorMessage = "「${action.title}」是「${action.kind.label}」类型的动作，不在结果卡片里显示结果。",
+                    ),
+                )
+            }
+        }
+
+        if (action.prompt.isBlank()) {
+            return flow {
+                emit(
+                    ActionEvent.Failure(
+                        engineBadge = action.title,
+                        errorMessage = "「${action.title}」还没有写提示词。请在 QDuo 的「动作」页点这个动作，填好提示词。",
                     ),
                 )
             }
@@ -90,7 +113,7 @@ object ActionExecutor {
             modelId = modelName,
         )
         val badge = "$modelName · ${action.title}"
-        val systemPrompt = QDuoPrompts.forAction(action)
+        val systemPrompt = action.prompt
         return flow {
             emit(ActionEvent.Loading(badge, "正在请求 $modelName…"))
             var latest = ""

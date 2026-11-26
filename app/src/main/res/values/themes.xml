@@ -18,4 +18,8 @@
     <style name="Theme.QDuoDroid.BottomSheetDialog" parent="Theme.Material3.DayNight.BottomSheetDialog">
         <item name="colorPrimary">#1F6FEB</item>
     </style>
+
+    <style name="Widget.QDuoDroid.NavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">#DCE8FD</item>
+    </style>
 </resources>

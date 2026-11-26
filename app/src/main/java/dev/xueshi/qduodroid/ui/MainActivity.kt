@@ -38,6 +38,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
@@ -51,7 +52,6 @@ import dev.xueshi.qduodroid.engine.LlmProviders
 import dev.xueshi.qduodroid.engine.ModelInfo
 import dev.xueshi.qduodroid.engine.ModelListState
 import dev.xueshi.qduodroid.engine.ModelListStore
-import dev.xueshi.qduodroid.model.QDuoAction
 import dev.xueshi.qduodroid.overlay.OverlayController
 import dev.xueshi.qduodroid.service.ClipboardWatchService
 import dev.xueshi.qduodroid.service.SelectionAccessibilityService
@@ -66,9 +66,16 @@ import rikka.shizuku.Shizuku
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var rootScroll: ScrollView
-    private lateinit var contentContainer: LinearLayout
+    private lateinit var rootContainer: LinearLayout
+    private lateinit var bottomNav: BottomNavigationView
+    private lateinit var pageActions: View
+    private lateinit var pageSettings: View
+    private lateinit var pageDebug: View
+    private lateinit var settingsScroll: ScrollView
+    private lateinit var actionsPage: ActionsPage
     private lateinit var tvAppVersion: TextView
+    private lateinit var viewWatchDot: View
+    private lateinit var tvHomePermissionWarning: TextView
     private lateinit var layoutPermissionsHeader: LinearLayout
     private lateinit var tvPermissionsSummary: TextView
     private lateinit var tvPermissionsToggle: TextView
@@ -126,7 +133,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvModelListStatus: TextView
     private lateinit var layoutThinkingSelector: LinearLayout
     private lateinit var tvThinkingValue: TextView
-    private lateinit var switchUseLlmForTranslate: MaterialSwitch
     private lateinit var btnSaveLlmConfig: MaterialButton
     private lateinit var btnTestLlmConfig: MaterialButton
     private lateinit var tvLlmTestStatus: TextView
@@ -192,6 +198,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         bindViews()
+        actionsPage = ActionsPage(this, pageActions)
+        setupTabs(savedInstanceState?.getInt(STATE_SELECTED_TAB) ?: R.id.tabActions)
         applySafeAreaInsets()
         setupHeaderVersion()
         styleAiInputBoxes()
@@ -214,6 +222,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         refreshStatuses()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(STATE_SELECTED_TAB, bottomNav.selectedItemId)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -241,9 +254,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindViews() {
-        rootScroll = findViewById(R.id.rootScroll)
-        contentContainer = findViewById(R.id.contentContainer)
+        rootContainer = findViewById(R.id.rootContainer)
+        bottomNav = findViewById(R.id.bottomNav)
+        pageActions = findViewById(R.id.pageActions)
+        pageSettings = findViewById(R.id.pageSettings)
+        pageDebug = findViewById(R.id.pageDebug)
+        // <include> 的 id 会替换掉被引入布局根节点的 id，所以设置页的 ScrollView 就是 pageSettings 本身。
+        settingsScroll = pageSettings as ScrollView
         tvAppVersion = findViewById(R.id.tvAppVersion)
+        viewWatchDot = findViewById(R.id.viewWatchDot)
+        tvHomePermissionWarning = findViewById(R.id.tvHomePermissionWarning)
         layoutPermissionsHeader = findViewById(R.id.layoutPermissionsHeader)
         tvPermissionsSummary = findViewById(R.id.tvPermissionsSummary)
         tvPermissionsToggle = findViewById(R.id.tvPermissionsToggle)
@@ -301,7 +321,6 @@ class MainActivity : AppCompatActivity() {
         tvModelListStatus = findViewById(R.id.tvModelListStatus)
         layoutThinkingSelector = findViewById(R.id.layoutThinkingSelector)
         tvThinkingValue = findViewById(R.id.tvThinkingValue)
-        switchUseLlmForTranslate = findViewById(R.id.switchUseLlmForTranslate)
         btnSaveLlmConfig = findViewById(R.id.btnSaveLlmConfig)
         btnTestLlmConfig = findViewById(R.id.btnTestLlmConfig)
         tvLlmTestStatus = findViewById(R.id.tvLlmTestStatus)
@@ -315,20 +334,41 @@ class MainActivity : AppCompatActivity() {
         tvLogs = findViewById(R.id.tvLogs)
     }
 
+    /**
+     * 三个页面放在同一个 FrameLayout 里，底部导航切换时只改它们的可见性。
+     * 这样各页面的控件一直都在，MainActivity 里原有的绑定和刷新逻辑不用区分当前在哪一页。
+     */
+    private fun setupTabs(initialTabId: Int) {
+        bottomNav.setOnItemSelectedListener { item ->
+            showPage(item.itemId)
+            true
+        }
+        bottomNav.setOnItemReselectedListener { item ->
+            if (item.itemId == R.id.tabSettings) settingsScroll.smoothScrollTo(0, 0)
+        }
+        bottomNav.selectedItemId = initialTabId
+        showPage(initialTabId)
+        tvHomePermissionWarning.setOnClickListener {
+            bottomNav.selectedItemId = R.id.tabSettings
+        }
+    }
+
+    private fun showPage(tabId: Int) {
+        pageActions.visibility = if (tabId == R.id.tabActions) View.VISIBLE else View.GONE
+        pageSettings.visibility = if (tabId == R.id.tabSettings) View.VISIBLE else View.GONE
+        pageDebug.visibility = if (tabId == R.id.tabDebug) View.VISIBLE else View.GONE
+    }
+
     private fun applySafeAreaInsets() {
-        val baseLeft = contentContainer.paddingLeft
-        val baseTop = contentContainer.paddingTop
-        val baseRight = contentContainer.paddingRight
-        val baseBottom = contentContainer.paddingBottom
-        ViewCompat.setOnApplyWindowInsetsListener(rootScroll) { _, windowInsets ->
+        // 顶部和左右让出状态栏、刘海；底部的导航栏高度由 BottomNavigationView 自己处理。
+        ViewCompat.setOnApplyWindowInsetsListener(rootContainer) { _, windowInsets ->
             val bars = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
             )
-            rootScroll.setPadding(bars.left, bars.top, bars.right, 0)
-            contentContainer.setPadding(baseLeft, baseTop, baseRight, baseBottom + bars.bottom)
+            rootContainer.setPadding(bars.left, bars.top, bars.right, 0)
             windowInsets
         }
-        ViewCompat.requestApplyInsets(rootScroll)
+        ViewCompat.requestApplyInsets(rootContainer)
     }
 
     private fun setupHeaderVersion() {
@@ -376,8 +416,9 @@ class MainActivity : AppCompatActivity() {
             aiConfigExpanded = true
             applyAiConfigExpandedUi()
             fetchModels(force = false)
-            rootScroll.post {
-                rootScroll.smoothScrollTo(0, (cardAiConfig.top - dp(12)).coerceAtLeast(0))
+            bottomNav.selectedItemId = R.id.tabSettings
+            settingsScroll.post {
+                settingsScroll.smoothScrollTo(0, (cardAiConfig.top - dp(12)).coerceAtLeast(0))
             }
             intent.removeExtra(EXTRA_EXPAND_AI_CONFIG)
         }
@@ -508,7 +549,7 @@ class MainActivity : AppCompatActivity() {
                 ClipboardWatchService.applyExemptionsNow(this)
                 Toast.makeText(this, "正在通过 Shizuku 写入后台白名单…", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(this, "请先开启上方监听（也可在系统电池设置中手动放行）", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "请先在「动作」页开启监听（也可在系统电池设置中手动放行）", Toast.LENGTH_SHORT).show()
                 runCatching {
                     startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                 }
@@ -532,7 +573,7 @@ class MainActivity : AppCompatActivity() {
             if (snap.watchServiceRunning && snap.userServiceConnected) {
                 ClipboardWatchService.requestTestWake(this)
             } else {
-                Toast.makeText(this, "请先开启上方监听连接 Shizuku", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "请先在「动作」页开启监听，连接 Shizuku", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -638,12 +679,6 @@ class MainActivity : AppCompatActivity() {
             fetchModels(force = true)
         }
 
-        switchUseLlmForTranslate.setOnCheckedChangeListener { _, isChecked ->
-            if (!isPopulatingAiInputs) {
-                appPrefs.useLlmForTranslate = isChecked
-            }
-        }
-
         btnSaveLlmConfig.setOnClickListener {
             saveAiConfigFromInputs()
             refreshAiConfigSummary()
@@ -739,7 +774,7 @@ class MainActivity : AppCompatActivity() {
             cm.setPrimaryClip(ClipData.newPlainText("QDuo Test", sample))
             MonitorState.addLog("已主动写入剪贴板 (${sample.length} 字)")
             if (!MonitorState.snapshot.value.watchServiceRunning) {
-                Toast.makeText(this, "已复制，请先开启上方「剪贴板悬浮条监听」", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "已复制，请先在「动作」页开启监听", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -1236,6 +1271,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePermissionsCardState(allReady: Boolean) {
+        tvHomePermissionWarning.visibility = if (allReady) View.GONE else View.VISIBLE
         tvPermissionsSummary.text = if (allReady) "全部已就绪 ✓" else "待完成"
         tvPermissionsSummary.setTextColor(
             if (allReady) Color.parseColor("#047857") else Color.parseColor("#B45309"),
@@ -1311,12 +1347,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        tvWatchMode.text = "当前状态：${snap.activeMode}"
-        btnToggleWatch.text = if (snap.watchServiceRunning) {
-            "停止剪贴板悬浮条监听"
+        tvWatchMode.text = if (snap.watchServiceRunning) {
+            "监听中 · ${snap.activeMode}"
+        } else if (snap.activeMode == "未启动") {
+            "监听未开启"
         } else {
-            "开启剪贴板悬浮条监听"
+            "监听未开启 · ${snap.activeMode}"
         }
+        viewWatchDot.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.parseColor(if (snap.watchServiceRunning) "#10B981" else "#D1D5DB"))
+        }
+        btnToggleWatch.text = if (snap.watchServiceRunning) "暂停" else "开启监听"
         if (switchAutoMonitor.isChecked != snap.autoStartMonitoring) {
             switchAutoMonitor.isChecked = snap.autoStartMonitoring
         }
@@ -1424,7 +1466,6 @@ class MainActivity : AppCompatActivity() {
         etLlmBaseUrl.setText(url)
         etLlmApiKey.setText(key)
         etLlmModelManual.setText(model)
-        switchUseLlmForTranslate.isChecked = appPrefs.useLlmForTranslate
         isPopulatingAiInputs = false
 
         val cached = ModelListStore.getCached(
@@ -1522,7 +1563,6 @@ class MainActivity : AppCompatActivity() {
         if (manualModelTyping) {
             appPrefs.llmModel = etLlmModelManual.text.toString().trim()
         }
-        appPrefs.useLlmForTranslate = switchUseLlmForTranslate.isChecked
     }
 
     private fun refreshAiConfigSummary() {
@@ -1593,7 +1633,7 @@ class MainActivity : AppCompatActivity() {
         val content = OverlayController.buildResultSheetView(
             context = this,
             inputText = text,
-            initialAction = QDuoAction.TRANSLATE,
+            initialAction = null,
             onDismiss = { dialog.dismiss() },
         )
         container.addView(
@@ -1625,6 +1665,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_EXPAND_AI_CONFIG = "expand_ai_config"
+        private const val STATE_SELECTED_TAB = "selected_tab"
         private const val REQ_SHIZUKU_PERMISSION = 1001
         private const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
     }

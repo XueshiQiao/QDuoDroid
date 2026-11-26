@@ -11,7 +11,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import dev.xueshi.qduodroid.R
-import dev.xueshi.qduodroid.model.QDuoAction
 import dev.xueshi.qduodroid.overlay.OverlayController
 import dev.xueshi.qduodroid.state.MonitorState
 
@@ -64,7 +63,7 @@ class ProcessTextActivity : AppCompatActivity() {
         MonitorState.addLog("[$sourceLabel] 触发 (${cleaned.length} 字)")
 
         if (Settings.canDrawOverlays(this)) {
-            OverlayController.showResultSheet(applicationContext, cleaned, QDuoAction.TRANSLATE)
+            OverlayController.showResultSheet(applicationContext, cleaned, initialAction = null)
             finish()
             return
         }
@@ -75,7 +74,7 @@ class ProcessTextActivity : AppCompatActivity() {
         val sheetContent = OverlayController.buildResultSheetView(
             context = this,
             inputText = cleaned,
-            initialAction = QDuoAction.TRANSLATE,
+            initialAction = null,
             onDismiss = { dialog.dismiss() },
         )
         container.addView(
