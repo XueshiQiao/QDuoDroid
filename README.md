@@ -33,3 +33,9 @@ adb install -r app/build/outputs/apk/debug/QDuoDroid-v<版本号>-build<build号
 
 关于双层防冻结原理、`ShizukuProvider` 声明、`IBinder.DeathRecipient` 防僵尸进程及 OriginOS 实测排查详情，见：
 - `~/dotfiles/notes/android-Shizuku-防冻结与后台剪贴板唤醒架构指南.md`
+
+## 许可证
+
+本项目以 [GNU General Public License v3.0 or later](LICENSE)（SPDX：`GPL-3.0-or-later`）发布。
+
+Copyright (C) 2026 XueshiQiao
