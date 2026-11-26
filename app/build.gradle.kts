@@ -5,6 +5,11 @@ plugins {
 val appVersionCode = 20
 val appVersionName = "0.3.6"
 
+// release 签名：只在设置了下面这几个环境变量时启用（GitHub Actions 的发布流程会设置）。
+// 没设置时 release 包不签名，debug 包照常用本机的 debug 密钥。
+val releaseKeystoreFile: String? = System.getenv("QDUO_KEYSTORE_FILE")
+val releaseKeystorePassword: String? = System.getenv("QDUO_KEYSTORE_PASSWORD")
+
 base {
     archivesName.set("QDuoDroid-v$appVersionName-build$appVersionCode")
 }
@@ -19,6 +24,23 @@ android {
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
+    }
+
+    signingConfigs {
+        if (releaseKeystoreFile != null && releaseKeystorePassword != null) {
+            create("release") {
+                storeFile = file(releaseKeystoreFile)
+                storePassword = releaseKeystorePassword
+                keyAlias = "qduodroid"
+                keyPassword = releaseKeystorePassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
     }
 
     buildFeatures {

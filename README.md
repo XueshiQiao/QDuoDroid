@@ -29,6 +29,10 @@ ls -lh app/build/outputs/apk/debug/
 adb install -r app/build/outputs/apk/debug/QDuoDroid-v<版本号>-build<build号>-debug.apk
 ```
 
+## 发布
+
+签名后的 release APK 由 GitHub Actions 构建。把 `app/build.gradle.kts` 里的 `appVersionName` / `appVersionCode` 改好并推上 main，再推送同名 tag（例如 `v0.3.6`），`.github/workflows/release.yml` 就会跑单元测试、用 release 密钥签名，并把 APK 和它的 SHA-256 校验文件发布到 GitHub Releases。tag 和 `appVersionName` 对不上时发布会直接失败。
+
 ## 架构与踩坑笔记
 
 关于双层防冻结原理、`ShizukuProvider` 声明、`IBinder.DeathRecipient` 防僵尸进程及 OriginOS 实测排查详情，见：
